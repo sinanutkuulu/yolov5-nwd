@@ -140,15 +140,20 @@ class ComputeLoss:
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
                 #iou = bbox_iou(pbox, tbox[i], CIoU=True).squeeze()  # iou(prediction, target)
                 iou = bbox_overlaps_nwd(pbox, tbox[i]).squeeze()
+                print("IoU shape 1: ", iou.size())
                 lbox += (1.0 - iou).mean()  # iou loss
 
                 # Objectness
                 iou = iou.detach().clamp(0).type(tobj.dtype)
+                print("IoU shape 2: ", iou.size())
                 if self.sort_obj_iou:
+                    print("Entered")
                     j = iou.argsort()
                     b, a, gj, gi, iou = b[j], a[j], gj[j], gi[j], iou[j]
                 if self.gr < 1:
+                    print("Entered")
                     iou = (1.0 - self.gr) + self.gr * iou
+                assert len(b) == len(a) == len(gj) == len(gi) == iou.shape[0]
                 tobj[b, a, gj, gi] = iou  # iou ratio
 
                 # Classification
