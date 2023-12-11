@@ -49,7 +49,7 @@ from ultralytics.utils.checks import check_requirements
 
 from utils import TryExcept, emojis
 from utils.downloads import curl_download, gsutil_getsize
-from utils.metrics import box_iou, fitness
+from utils.metrics import box_iou, fitness, bbox_overlaps_nwd
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
@@ -863,6 +863,39 @@ def clip_segments(segments, shape):
         segments[:, 1] = segments[:, 1].clip(0, shape[0])  # y
 
 
+def nwd_based_nms(boxes, scores, iou_thres=0.45):
+    """
+    Perform Non-Maximum Suppression using Normalized Wasserstein Distance.
+
+    Args:
+        boxes (Tensor): Bounding boxes, shape (N, 4).
+        scores (Tensor): Scores for each bounding box, shape (N,).
+        nwd_thres (float): NWD threshold for suppressing boxes.
+
+    Returns:
+        Tensor: Indices of boxes that are kept.
+    """
+    keep = []
+    order = scores.sort(0, descending=True)[1]
+
+    while order.numel() > 0:
+        if order.numel() == 1:
+            keep.append(order.item())
+            break
+
+        i = order[0]
+        keep.append(i)
+
+        # Compute NWD between the highest score box and the rest
+        nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
+
+        # Filter out boxes with NWD higher than the threshold
+        mask = nwd < iou_thres
+        order = order[1:][mask]
+
+    return torch.float64(keep)
+
+
 def non_max_suppression(
         prediction,
         conf_thres=0.25,
@@ -956,11 +989,13 @@ def non_max_suppression(
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+        #i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+        i = nwd_based_nms(boxes, scores, iou_thres)
         i = i[:max_det]  # limit detections
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
+            #iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
+            iou = bbox_overlaps_nwd(boxes[i], boxes) > iou_thres  # iou matrix
             weights = iou * scores[None]  # box weights
             x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
             if redundant:

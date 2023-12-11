@@ -260,6 +260,50 @@ def bbox_iou(box1, box2, xywh=True, GIoU=False, DIoU=False, CIoU=False, eps=1e-7
     return iou  # IoU
 
 
+
+'''
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, constant=12.8):
+
+            center1 = (bboxes1[..., :, None, :2] + bboxes1[..., :, None, 2:]) / 2
+            center2 = (bboxes2[..., None, :, :2] + bboxes2[..., None, :, 2:]) / 2
+            whs = center1[..., :2] - center2[..., :2]
+
+            center_distance = whs[..., 0] * whs[..., 0] + whs[..., 1] * whs[..., 1] + eps #
+
+            w1 = bboxes1[..., :, None, 2] - bboxes1[..., :, None, 0]  + eps
+            h1 = bboxes1[..., :, None, 3] - bboxes1[..., :, None, 1]  + eps
+            w2 = bboxes2[..., None, :, 2] - bboxes2[..., None, :, 0]  + eps
+            h2 = bboxes2[..., None, :, 3] - bboxes2[..., None, :, 1]  + eps
+
+            wh_distance = ((w1 - w2) ** 2 + (h1 - h2) ** 2) / 4
+
+            wassersteins = torch.sqrt(center_distance + wh_distance)
+
+            normalized_wasserstein = torch.exp(-wassersteins/constant)
+
+            return normalized_wasserstein
+
+'''
+
+
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, constant=12.8):
+    # Extract centers, width, and height from bboxes1 and bboxes2
+    center_x1, center_y1, w1, h1 = bboxes1[..., 0], bboxes1[..., 1], bboxes1[..., 2], bboxes1[..., 3]
+    center_x2, center_y2, w2, h2 = bboxes2[..., 0], bboxes2[..., 1], bboxes2[..., 2], bboxes2[..., 3]
+
+    # Calculate the center distances
+    center_distance = (center_x1[..., None] - center_x2[..., None, None]) ** 2 + (center_y1[..., None] - center_y2[..., None, None]) ** 2 + eps
+
+    # Calculate width and height distances
+    wh_distance = ((w1[..., None] - w2[..., None, None]) ** 2 + (h1[..., None] - h2[..., None, None]) ** 2) / 4
+
+    # Calculate Wasserstein distances and normalize
+    wassersteins = torch.sqrt(center_distance + wh_distance)
+    normalized_wasserstein = torch.exp(-wassersteins / constant)
+
+    return normalized_wasserstein
+
+
 def box_iou(box1, box2, eps=1e-7):
     # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
     """

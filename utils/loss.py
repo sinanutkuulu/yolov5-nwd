@@ -6,7 +6,7 @@ Loss functions
 import torch
 import torch.nn as nn
 
-from utils.metrics import bbox_iou
+from utils.metrics import bbox_iou, bbox_overlaps_nwd
 from utils.torch_utils import de_parallel
 
 
@@ -138,7 +138,8 @@ class ComputeLoss:
                 pxy = pxy.sigmoid() * 2 - 0.5
                 pwh = (pwh.sigmoid() * 2) ** 2 * anchors[i]
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
-                iou = bbox_iou(pbox, tbox[i], CIoU=True).squeeze()  # iou(prediction, target)
+                #iou = bbox_iou(pbox, tbox[i], CIoU=True).squeeze()  # iou(prediction, target)
+                iou = bbox_overlaps_nwd(pbox, tbox[i]).squeeze()
                 lbox += (1.0 - iou).mean()  # iou loss
 
                 # Objectness
