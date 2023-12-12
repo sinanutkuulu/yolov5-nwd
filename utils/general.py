@@ -893,7 +893,7 @@ def nwd_based_nms(boxes, scores, iou_thres=0.45):
         mask = nwd < iou_thres
         order = order[1:][mask]
 
-    return return torch.tensor(keep, dtype=torch.long)
+    return  torch.tensor(keep, dtype=torch.long)
 
 
 def non_max_suppression(
