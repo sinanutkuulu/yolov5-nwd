@@ -996,14 +996,20 @@ def non_max_suppression(
         #i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         i = nwd_based_nms(boxes, scores, iou_thres)
         i = i[:max_det]  # limit detections
-        if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+        #if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
             #iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            iou = bbox_overlaps_nwd(boxes[i], boxes) > iou_thres
-            weights = iou * scores[None]  # box weights
+            #iou = bbox_overlaps_nwd(boxes[i], boxes) > iou_thres
+            #weights = iou * scores[None]  # box weights
+            #x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
+            #if redundant:
+                #i = i[iou.sum(1) > 1]  # require redundancy
+        if merge and (1 < n < 3E3):  # Merge NMS with NWD
+            nwd = bbox_overlaps_nwd(boxes[i], boxes)
+            close_boxes = nwd < iou_thres  # Define a threshold for 'closeness'
+            weights = (1 - nwd) * scores[None]  # Invert NWD for weights
+            weights[~close_boxes] = 0  # Set weights of not-close boxes to 0
             x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            if redundant:
-                i = i[iou.sum(1) > 1]  # require redundancy
 
         output[xi] = x[i]
         if mps:
