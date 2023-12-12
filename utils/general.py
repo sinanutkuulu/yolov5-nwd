@@ -863,7 +863,7 @@ def clip_segments(segments, shape):
         segments[:, 1] = segments[:, 1].clip(0, shape[0])  # y
 
 
-def nwd_based_nms(boxes, scores, iou_thres=0.45):
+def nwd_based_nms(boxes, scores, iou_thres=0.45, score_margin=0.1):
     """
     Perform Non-Maximum Suppression using Normalized Wasserstein Distance.
 
