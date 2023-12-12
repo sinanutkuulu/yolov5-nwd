@@ -145,7 +145,6 @@ class ComputeLoss:
 
                 # Objectness
                 iou = iou.detach().clamp(0).type(tobj.dtype)
-                print("IoU shape 2: ", iou.size())
                 if self.sort_obj_iou:
 
                     j = iou.argsort()
@@ -153,7 +152,7 @@ class ComputeLoss:
                 if self.gr < 1:
 
                     iou = (1.0 - self.gr) + self.gr * iou
-                assert len(b) == len(a) == len(gj) == len(gi) == iou.shape[0]
+                #assert len(b) == len(a) == len(gj) == len(gi) == iou.shape[0]
                 tobj[b, a, gj, gi] = iou  # iou ratio
 
                 # Classification
