@@ -877,23 +877,27 @@ def nwd_based_nms(boxes, scores, iou_thres=0.45):
     """
     keep = []
     order = scores.sort(0, descending=True)[1]
+    top_score = scores[order[0]]  # Highest score
 
-    while order.numel() > 0:
-        if order.numel() == 1:
-            keep.append(order.item())
+    # Pre-filter boxes
+    pre_filtered_order = order[scores[order] >= top_score - score_margin]
+
+    while pre_filtered_order.numel() > 0:
+        if pre_filtered_order.numel() == 1:
+            keep.append(pre_filtered_order.item())
             break
 
-        i = order[0]
+        i = pre_filtered_order[0]
         keep.append(i)
 
-        # Compute NWD between the highest score box and the rest
-        nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
+        # Compute NWD for batch
+        nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[pre_filtered_order[1:]])
 
-        # Filter out boxes with NWD higher than the threshold
+        # Filter out boxes
         mask = nwd < iou_thres
-        order = order[1:][mask]
+        pre_filtered_order = pre_filtered_order[1:][mask]
 
-    return  torch.tensor(keep, dtype=torch.long)
+    return torch.tensor(keep, dtype=torch.long)
 
 
 def non_max_suppression(
@@ -995,7 +999,7 @@ def non_max_suppression(
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
             #iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            iou = bbox_overlaps_nwd(boxes[i], boxes) > iou_thres  # iou matrix
+            iou = bbox_overlaps_nwd(boxes[i], boxes) > iou_thres
             weights = iou * scores[None]  # box weights
             x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
             if redundant:
