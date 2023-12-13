@@ -863,23 +863,17 @@ def clip_segments(segments, shape):
         segments[:, 1] = segments[:, 1].clip(0, shape[0])  # y
 
 
-def nwd_based_nms(boxes, scores, iou_thres=0.45, score_margin=0.1):
-    """
-    Perform Non-Maximum Suppression using Normalized Wasserstein Distance.
+def nwd_based_nms(boxes, scores, iou_thres=0.45, score_margin=0.4):
 
-    Args:
-        boxes (Tensor): Bounding boxes, shape (N, 4).
-        scores (Tensor): Scores for each bounding box, shape (N,).
-        nwd_thres (float): NWD threshold for suppressing boxes.
-
-    Returns:
-        Tensor: Indices of boxes that are kept.
-    """
     keep = []
     order = scores.sort(0, descending=True)[1]
     top_score = scores[order[0]]  # Highest score
 
     # Pre-filter boxes
+    '''
+    Only the boxes with scores within the score_margin of the top score are considered for further processing.
+     This step helps to reduce the number of boxes to be processed, improving efficiency
+    '''
     pre_filtered_order = order[scores[order] >= top_score - score_margin]
 
     while pre_filtered_order.numel() > 0:
