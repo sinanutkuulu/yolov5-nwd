@@ -245,18 +245,6 @@ class ComputeLoss:
         ai = torch.arange(na, device=self.device).float().view(na, 1).repeat(1, nt)  # same as .repeat_interleave(nt)
         targets = torch.cat((targets.repeat(na, 1, 1), ai[..., None]), 2)  # append anchor indices
 
-        g = 0.5  # bias
-        off = torch.tensor(
-            [
-                [0, 0],
-                [1, 0],
-                [0, 1],
-                [-1, 0],
-                [0, -1],  # j,k,l,m
-                # [1, 1], [1, -1], [-1, 1], [-1, -1],  # jk,jm,lk,lm
-            ],
-            device=self.device).float() * g  # offsets
-
         for i in range(self.nl):
             anchors, shape = self.anchors[i], p[i].shape
             gain[2:6] = torch.tensor(shape)[[3, 2, 3, 2]]  # xyxy gain
@@ -267,6 +255,7 @@ class ComputeLoss:
                 nwd_scores = torch.zeros((na, nt), device=self.device)
                 for j in range(na):  # For each anchor
                     for k in range(nt):  # For each target
+                        print("Anchor size: ", anchors[j].size(), " Targets Size: ", t[k, 2:6].size())
                         nwd_scores[j, k] = bbox_overlaps_nwd(anchors[j].view(1, 4), t[k, 2:6].view(1, 4))  # Calculate NWD
 
                 # Assign the two best scoring anchors as positive for each target
