@@ -177,7 +177,7 @@ class ComputeLoss:
         bs = tobj.shape[0]  # batch size
 
         return (lbox + lobj + lcls) * bs, torch.cat((lbox, lobj, lcls)).detach()
-
+    '''
     def build_targets(self, p, targets):
         # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
         na, nt = self.na, targets.shape[0]  # number of anchors, targets
@@ -222,6 +222,69 @@ class ComputeLoss:
             else:
                 t = targets[0]
                 offsets = 0
+
+            # Define
+            bc, gxy, gwh, a = t.chunk(4, 1)  # (image, class), grid xy, grid wh, anchors
+            a, (b, c) = a.long().view(-1), bc.long().T  # anchors, image, class
+            gij = (gxy - offsets).long()
+            gi, gj = gij.T  # grid indices
+
+            # Append
+            indices.append((b, a, gj.clamp_(0, shape[2] - 1), gi.clamp_(0, shape[3] - 1)))  # image, anchor, grid
+            tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
+            anch.append(anchors[a])  # anchors
+            tcls.append(c)  # class
+
+        return tcls, tbox, indices, anch
+        '''
+    def build_targets(self, p, targets):
+        # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
+        na, nt = self.na, targets.shape[0]  # number of anchors, targets
+        tcls, tbox, indices, anch = [], [], [], []
+        gain = torch.ones(7, device=self.device)  # normalized to gridspace gain
+        ai = torch.arange(na, device=self.device).float().view(na, 1).repeat(1, nt)  # same as .repeat_interleave(nt)
+        targets = torch.cat((targets.repeat(na, 1, 1), ai[..., None]), 2)  # append anchor indices
+
+        g = 0.5  # bias
+        off = torch.tensor(
+            [
+                [0, 0],
+                [1, 0],
+                [0, 1],
+                [-1, 0],
+                [0, -1],  # j,k,l,m
+                # [1, 1], [1, -1], [-1, 1], [-1, -1],  # jk,jm,lk,lm
+            ],
+            device=self.device).float() * g  # offsets
+
+        for i in range(self.nl):
+            anchors, shape = self.anchors[i], p[i].shape
+            gain[2:6] = torch.tensor(shape)[[3, 2, 3, 2]]  # xyxy gain
+
+            # Match targets to anchors
+            t = targets * gain  # shape(3,n,7)
+            if nt:
+                nwd_scores = torch.zeros((na, nt), device=self.device)
+                for j in range(na):  # For each anchor
+                    for k in range(nt):  # For each target
+                        nwd_scores[j, k] = bbox_overlaps_nwd(anchors[j].view(1, 4),
+                                                             t[k, 2:6].view(1, 4))  # Calculate NWD
+
+                # Assign the two best scoring anchors as positive for each target
+                top_nwd_indices = torch.topk(nwd_scores, 2, dim=0).indices  # top 2 indices for each target
+                for k in range(nt):
+                    positive_indices = top_nwd_indices[:, k]
+                    # Set targets for positive samples
+                    for idx in positive_indices:
+                        b, c = targets[k, :2].long()  # image, class
+                        gxy = t[k, 2:4]  # grid xy
+                        gwh = t[k, 4:6]  # grid wh
+                        gi, gj = gxy.long()  # grid indices
+                        indices.append((b, idx, gj, gi))  # image, anchor, grid y, grid x
+                        tbox.append(torch.cat((gxy - gxy.floor(), gwh), 1))  # box
+                        anch.append(anchors[idx])  # anchors
+                        tcls.append(c)  # class
+
 
             # Define
             bc, gxy, gwh, a = t.chunk(4, 1)  # (image, class), grid xy, grid wh, anchors
