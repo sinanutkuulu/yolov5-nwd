@@ -267,8 +267,7 @@ class ComputeLoss:
                 nwd_scores = torch.zeros((na, nt), device=self.device)
                 for j in range(na):  # For each anchor
                     for k in range(nt):  # For each target
-                        nwd_scores[j, k] = bbox_overlaps_nwd(anchors[j].view(1, 4),
-                                                             t[k, 2:6].view(1, 4))  # Calculate NWD
+                        nwd_scores[j, k] = bbox_overlaps_nwd(anchors[j].view(1, 4), t[k, 2:6].view(1, 4))  # Calculate NWD
 
                 # Assign the two best scoring anchors as positive for each target
                 top_nwd_indices = torch.topk(nwd_scores, 2, dim=0).indices  # top 2 indices for each target
