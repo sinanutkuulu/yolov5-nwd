@@ -246,7 +246,7 @@ class ComputeLoss:
         targets = torch.cat((targets.repeat(na, 1, 1), ai[..., None]), 2)  # append anchor indices
 
         for i in range(self.nl):
-            anchors, shape = self.anchors[i], p[i].shape
+            anchors, shape = self.anchors, p[i].shape
             gain[2:6] = torch.tensor(shape)[[3, 2, 3, 2]]  # xyxy gain
 
             # Match targets to anchors
