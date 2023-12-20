@@ -1,0 +1,14 @@
+path: '/content/gdrive/My Drive/aitod'
+train: 'images/train'
+val:  'images/val'
+test: 'images/test'
+
+names:
+  0: AI
+  1: BR
+  2: ST
+  3: SH
+  4: SP
+  5: VEH
+  6: PR
+  7: WM
