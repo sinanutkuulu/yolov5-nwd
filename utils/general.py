@@ -863,33 +863,24 @@ def clip_segments(segments, shape):
         segments[:, 1] = segments[:, 1].clip(0, shape[0])  # y
 
 
-def nwd_based_nms(boxes, scores, iou_thres=0.45, score_margin=0.4):
-
+def nwd_based_nms(boxes, scores, iou_thres=0.45):
     keep = []
     order = scores.sort(0, descending=True)[1]
-    top_score = scores[order[0]]  # Highest score
 
-    # Pre-filter boxes
-    '''
-    Only the boxes with scores within the score_margin of the top score are considered for further processing.
-     This step helps to reduce the number of boxes to be processed, improving efficiency
-    '''
-    pre_filtered_order = order[scores[order] >= top_score - score_margin]
-
-    while pre_filtered_order.numel() > 0:
-        if pre_filtered_order.numel() == 1:
-            keep.append(pre_filtered_order.item())
+    while order.numel() > 0:
+        if order.numel() == 1:
+            keep.append(order.item())
             break
 
-        i = pre_filtered_order[0]
+        i = order[0]
         keep.append(i)
 
         # Compute NWD for batch
-        nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[pre_filtered_order[1:]])
+        nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
 
         # Filter out boxes
         mask = nwd < iou_thres
-        pre_filtered_order = pre_filtered_order[1:][mask]
+        order = order[1:][mask]
 
     return torch.tensor(keep, dtype=torch.long)
 
