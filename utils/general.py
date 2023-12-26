@@ -864,16 +864,21 @@ def clip_segments(segments, shape):
 
 
 def nwd_based_nms(boxes, scores, iou_thres=0.45):
-    keep = []
+    num_boxes = scores.size(0)
+    keep = torch.zeros(num_boxes, dtype=torch.long, device=scores.device)
+    keep_count = 0
+
     order = scores.sort(0, descending=True)[1]
 
     while order.numel() > 0:
         if order.numel() == 1:
-            keep.append(order.item())
+            keep[keep_count] = order.item()
+            keep_count += 1
             break
 
         i = order[0]
-        keep.append(i)
+        keep[keep_count] = i
+        keep_count += 1
 
         # Compute NWD for batch
         nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
@@ -882,7 +887,7 @@ def nwd_based_nms(boxes, scores, iou_thres=0.45):
         mask = nwd < iou_thres
         order = order[1:][mask]
 
-    return torch.tensor(keep, dtype=torch.long)
+    return keep[:keep_count]
 
 
 def non_max_suppression(

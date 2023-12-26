@@ -881,3 +881,38 @@ class Classify(nn.Module):
         if isinstance(x, list):
             x = torch.cat(x, 1)
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+
+
+class DecoupledHead(nn.Module):
+    def __init__(self, num_classes):
+        super(DecoupledHead, self).__init__()
+
+        self.num_classes = num_classes
+        # Initial 1x1 Convolution
+        self.init_conv = nn.Conv2d(in_channels=..., out_channels=256, kernel_size=1, stride=1, padding=0)
+
+        # Classification branch: two 3x3 convolutions
+        self.cls_branch = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=256, out_channels=num_classes, kernel_size=3, stride=1, padding=1)
+        )
+
+        # Regression branch: two 3x3 convolutions + IoU branch
+        self.reg_branch = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=256, out_channels=4, kernel_size=3, stride=1, padding=1)
+        )
+
+        # Objectness branch
+        self.obj_branch = nn.Conv2d(in_channels=256, out_channels=1, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        # Initial transformation
+        x = self.init_conv(x)
+
+        # Apply branches
+        cls_output = self.cls_branch(x)
+        reg_output = self.reg_branch(x)
+        obj_output = self.obj_branch(x)
+
+        return cls_output, reg_output, obj_output
