@@ -882,9 +882,9 @@ class Classify(nn.Module):
             x = torch.cat(x, 1)
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
 
-
+'''
 class DecoupledHead(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, c1, c2, k, s, p=None, g=1, dropout_p=0.0, num_classes=8):
         super(DecoupledHead, self).__init__()
 
         self.num_classes = num_classes
@@ -916,3 +916,53 @@ class DecoupledHead(nn.Module):
         obj_output = self.obj_branch(x)
 
         return cls_output, reg_output, obj_output
+'''
+
+
+class DecoupledHead(nn.Module):
+    def __init__(self,
+                 c1,
+                 k=1,
+                 s=1,
+                 p=None,
+                 g=1,
+                 dropout_p=0.0,
+                 num_classes=8):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
+        super(DecoupledHead, self).__init__()
+
+        # Initial Conv layer with auto_pad
+        #Conv(c1, c_, k, s, autopad(k, p), g)
+        self.init_conv = Conv(c1, 256, k, s, autopad(k, p), g)
+
+        # Intermediate layers with Convolution, AdaptiveAvgPool2d, and Dropout
+        k = 3
+        self.intermediate_conv = Conv(256, 256, k, s, autopad(k, p), g)
+        self.avgpool = nn.AdaptiveAvgPool2d(1)  # Spatial dimension reduction
+        self.dropout = nn.Dropout(p=dropout_p)
+
+        # Classification branch
+        self.cls_conv = nn.Conv2d(256, num_classes, 1)
+
+        # Regression branch
+        self.reg_conv = nn.Conv2d(256, 4, 1)
+
+        # Objectness branch
+        self.obj_conv = nn.Conv2d(256, 1, 1)
+
+    def forward(self, x):
+        x = self.init_conv(x)
+        x = self.intermediate_conv(x)
+        x = self.avgpool(x)
+        x = self.dropout(x)
+
+        cls_output = self.cls_conv(x)
+        reg_output = self.reg_conv(x)
+        obj_output = self.obj_conv(x)
+
+        # Flatten the outputs from (B, C, 1, 1) to (B, C)
+        cls_output = cls_output.view(cls_output.size(0), -1)
+        reg_output = reg_output.view(reg_output.size(0), -1)
+        obj_output = obj_output.view(obj_output.size(0), -1)
+
+        return cls_output, reg_output, obj_output
+

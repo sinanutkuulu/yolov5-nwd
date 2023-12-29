@@ -284,8 +284,21 @@ class ClassificationModel(BaseModel):
         m = model.model[-1]  # last layer
         ch = m.conv.in_channels if hasattr(m, 'conv') else m.cv1.conv.in_channels  # ch into module
         c = Classify(ch, nc)  # Classify()
+        #c = DecoupledHead(ch) # DecoupledHead()
+        #c.i, c.f, c.type = m.i, m.f, 'models.common.DecoupledHead'  # index, from, type
         c.i, c.f, c.type = m.i, m.f, 'models.common.Classify'  # index, from, type
         model.model[-1] = c  # replace
+
+        class Wrapper(nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+
+            def forward(self, x):
+                cls_output, _, _ = self.model(x)  # Get only classification output
+                return cls_output
+
+        #self.model = Wrapper(model.model) #for Decoupled Head to return only classification
         self.model = model.model
         self.stride = model.stride
         self.save = []

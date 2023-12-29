@@ -862,7 +862,7 @@ def clip_segments(segments, shape):
         segments[:, 0] = segments[:, 0].clip(0, shape[1])  # x
         segments[:, 1] = segments[:, 1].clip(0, shape[0])  # y
 
-
+'''
 def nwd_based_nms(boxes, scores, iou_thres=0.45):
     num_boxes = scores.size(0)
     keep = torch.zeros(num_boxes, dtype=torch.long, device=scores.device)
@@ -888,7 +888,7 @@ def nwd_based_nms(boxes, scores, iou_thres=0.45):
         order = order[1:][mask]
 
     return keep[:keep_count]
-
+'''
 
 def non_max_suppression(
         prediction,
@@ -950,65 +950,56 @@ def non_max_suppression(
         # If none remain process next image
         if not x.shape[0]:
             continue
+            # Compute conf
+            x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
 
-        # Compute conf
-        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
+            # Box/Mask
+            box = xywh2xyxy(x[:, :4])  # center_x, center_y, width, height) to (x1, y1, x2, y2)
+            mask = x[:, mi:]  # zero columns if no masks
 
-        # Box/Mask
-        box = xywh2xyxy(x[:, :4])  # center_x, center_y, width, height) to (x1, y1, x2, y2)
-        mask = x[:, mi:]  # zero columns if no masks
+            # Detections matrix nx6 (xyxy, conf, cls)
+            if multi_label:
+                i, j = (x[:, 5:mi] > conf_thres).nonzero(as_tuple=False).T
+                x = torch.cat((box[i], x[i, 5 + j, None], j[:, None].float(), mask[i]), 1)
+            else:  # best class only
+                conf, j = x[:, 5:mi].max(1, keepdim=True)
+                x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
 
-        # Detections matrix nx6 (xyxy, conf, cls)
-        if multi_label:
-            i, j = (x[:, 5:mi] > conf_thres).nonzero(as_tuple=False).T
-            x = torch.cat((box[i], x[i, 5 + j, None], j[:, None].float(), mask[i]), 1)
-        else:  # best class only
-            conf, j = x[:, 5:mi].max(1, keepdim=True)
-            x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
+            # Filter by class
+            if classes is not None:
+                x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
 
-        # Filter by class
-        if classes is not None:
-            x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
+            # Apply finite constraint
+            # if not torch.isfinite(x).all():
+            #     x = x[torch.isfinite(x).all(1)]
 
-        # Apply finite constraint
-        # if not torch.isfinite(x).all():
-        #     x = x[torch.isfinite(x).all(1)]
+            # Check shape
+            n = x.shape[0]  # number of boxes
+            if not n:  # no boxes
+                continue
+            x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence and remove excess boxes
 
-        # Check shape
-        n = x.shape[0]  # number of boxes
-        if not n:  # no boxes
-            continue
-        x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence and remove excess boxes
+            # Batched NMS
+            c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
+            boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
+            i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+            i = i[:max_det]  # limit detections
+            if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
+                # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
+                iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
+                weights = iou * scores[None]  # box weights
+                x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
+                if redundant:
+                    i = i[iou.sum(1) > 1]  # require redundancy
 
-        # Batched NMS
-        c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        #i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
-        i = nwd_based_nms(boxes, scores, iou_thres)
-        i = i[:max_det]  # limit detections
-        #if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
-            # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-            #iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-            #iou = bbox_overlaps_nwd(boxes[i], boxes) > iou_thres
-            #weights = iou * scores[None]  # box weights
-            #x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-            #if redundant:
-                #i = i[iou.sum(1) > 1]  # require redundancy
-        if merge and (1 < n < 3E3):  # Merge NMS with NWD
-            nwd = bbox_overlaps_nwd(boxes[i], boxes)
-            close_boxes = nwd < iou_thres  # Define a threshold for 'closeness'
-            weights = (1 - nwd) * scores[None]  # Invert NWD for weights
-            weights[~close_boxes] = 0  # Set weights of not-close boxes to 0
-            x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
+            output[xi] = x[i]
+            if mps:
+                output[xi] = output[xi].to(device)
+            if (time.time() - t) > time_limit:
+                LOGGER.warning(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
+                break  # time limit exceeded
 
-        output[xi] = x[i]
-        if mps:
-            output[xi] = output[xi].to(device)
-        if (time.time() - t) > time_limit:
-            LOGGER.warning(f'WARNING ⚠️ NMS time limit {time_limit:.3f}s exceeded')
-            break  # time limit exceeded
-
-    return output
+        return output
 
 
 def strip_optimizer(f='best.pt', s=''):  # from utils.general import *; strip_optimizer()
