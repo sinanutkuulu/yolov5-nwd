@@ -1,4 +1,4 @@
-path: '/content/gdrive/My Drive/aitod'
+path: '/content/gdrive/My Drive/aitod/aitodv2'
 train: 'images/train'
 val:  'images/val'
 test: 'images/test'
