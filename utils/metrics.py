@@ -286,16 +286,19 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, constant=12.8):
 '''
 
 
-def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, constant=12.8):
-    # Calculate center distances
-    center_distance = ((bboxes1[:, 0] - bboxes2[:, 0]) ** 2 + (bboxes1[:, 1] - bboxes2[:, 1]) ** 2 + eps)
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, C=12.8):
+    center1 = (bboxes1[..., :2] + bboxes1[..., 2:]) / 2
+    center2 = (bboxes2[..., :2] + bboxes2[..., 2:]) / 2
 
-    # Calculate width and height distances
-    wh_distance = ((bboxes1[:, 2] - bboxes2[:, 2]) ** 2 + (bboxes1[:, 3] - bboxes2[:, 3]) ** 2) / 4
+    wh1 = bboxes1[..., 2:] - bboxes1[..., :2]
+    wh2 = bboxes2[..., 2:] - bboxes2[..., :2]
 
-    # Calculate Wasserstein distances and normalize
+    center_distance = ((center1[..., 0] - center2[..., 0]) ** 2 + (center1[..., 1] - center2[..., 1]) ** 2 + eps)
+
+    wh_distance = ((wh1[..., 0] - wh2[..., 0]) ** 2 + (wh1[..., 1] - wh2[..., 1]) ** 2) / 4
+
     wassersteins = torch.sqrt(center_distance + wh_distance)
-    normalized_wasserstein = torch.exp(-wassersteins / constant)
+    normalized_wasserstein = torch.exp(-wassersteins / C)
 
     return normalized_wasserstein
 
