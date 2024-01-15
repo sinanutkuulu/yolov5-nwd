@@ -880,7 +880,7 @@ def nwd_based_nms(boxes, scores, nwd_thres=0.45):
         keep_count += 1
 
         # Compute NWD for batch
-        nwd = bbox_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
+        nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
 
         # Filter out boxes
         mask = nwd < nwd_thres
@@ -987,7 +987,7 @@ def non_max_suppression(
         i = i[:max_det]  # limit detections
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
                 # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-                iou = bbox_nwd(boxes[i], boxes) > nwd_thres  # iou matrix
+                iou = bbox_overlaps_nwd(boxes[i], boxes) > nwd_thres  # iou matrix
                 weights = iou * scores[None]  # box weights
                 x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
                 if redundant:
