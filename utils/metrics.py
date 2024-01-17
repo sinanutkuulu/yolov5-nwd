@@ -315,7 +315,7 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
 '''
 
 
-def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True, weight=2):
     center1 = (bboxes1[..., :, None, :2] + bboxes1[..., :, None, 2:]) / 2
     center2 = (bboxes2[..., None, :, :2] + bboxes2[..., None, :, 2:]) / 2
     whs = center1[..., :2] - center2[..., :2]
@@ -325,7 +325,6 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
     w1 = bboxes1[..., :, None, 2] - bboxes1[..., :, None, 0] + eps
     h1 = bboxes1[..., :, None, 3] - bboxes1[..., :, None, 1] + eps
     w2 = bboxes2[..., None, :, 2] - bboxes2[..., None, :, 0] + eps
-    h2 = bboxes2[..., None, :, 3] - bboxes2[..., None, :, 1] + eps
 
     wh_distance = ((w1 - w2) ** 2 + (h1 - h2) ** 2) / (weight ** 2)
 
