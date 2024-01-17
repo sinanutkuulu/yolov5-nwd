@@ -285,8 +285,19 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, constant=12.8):
 
 '''
 
-
-def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, C=12.8):
+'''
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
+    # Returns Normalized Wasserstein Distance of box1(1,4) to box2(n,4)
+    if xywh:  # transform from xywh to xyxy
+        (x1, y1, w1, h1), (x2, y2, w2, h2) = box1.chunk(4, -1), box2.chunk(4, -1)
+        w1_, h1_, w2_, h2_ = w1 / 2, h1 / 2, w2 / 2, h2 / 2
+        b1_x1, b1_x2, b1_y1, b1_y2 = x1 - w1_, x1 + w1_, y1 - h1_, y1 + h1_
+        b2_x1, b2_x2, b2_y1, b2_y2 = x2 - w2_, x2 + w2_, y2 - h2_, y2 + h2_
+    else:  # x1, y1, x2, y2 = box1
+        b1_x1, b1_y1, b1_x2, b1_y2 = box1.chunk(4, -1)
+        b2_x1, b2_y1, b2_x2, b2_y2 = box2.chunk(4, -1)
+        w1, h1 = b1_x2 - b1_x1, (b1_y2 - b1_y1).clamp(eps)
+        w2, h2 = b2_x2 - b2_x1, (b2_y2 - b2_y1).clamp(eps)
     center1 = (bboxes1[..., :2] + bboxes1[..., 2:]) / 2
     center2 = (bboxes2[..., :2] + bboxes2[..., 2:]) / 2
 
@@ -301,6 +312,30 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, C=12.8):
     normalized_wasserstein = torch.exp(-wassersteins / C)
 
     return normalized_wasserstein
+'''
+
+
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
+    # Returns Normalized Wasserstein Distance of box1(1,4) to box2(n,4)
+    if xywh:  # transform from xywh to xyxy
+        bboxes1 = bboxes1.view(-1, 4)
+        bboxes2 = bboxes2.view(-1, 4)
+        # Convert from [center_x, center_y, width, height] to [center_x, center_y, width/2, height/2]
+        boxes1 = torch.cat(((bboxes1[:, :2]), bboxes1[:, 2:] / 2), dim=1)
+        boxes2 = torch.cat(((bboxes2[:, :2]), bboxes2[:, 2:] / 2), dim=1)
+    else:  # assume input is already in the format [x1, y1, x2, y2]
+        # Convert from [x1, y1, x2, y2] to [center_x, center_y, width/2, height/2]
+        boxes1 = torch.cat(((bboxes1[:, 2:] + bboxes1[:, :2]) / 2, (bboxes1[:, 2:] - bboxes1[:, :2]) / 2), dim=1)
+        boxes2 = torch.cat(((bboxes2[:, 2:] + bboxes2[:, :2]) / 2, (bboxes2[:, 2:] - bboxes2[:, :2]) / 2), dim=1)
+
+    # Calculate Wasserstein distance using the provided formula
+    nwd = torch.norm(boxes1.unsqueeze(1) - boxes2.unsqueeze(0), dim=2,
+                     p=2)  # Frobenius norm (Euclidean norm in this case)
+
+    # Normalize Wasserstein distance to get NWD
+    normalized_nwd = torch.exp(-torch.sqrt(nwd) / C)
+
+    return normalized_nwd
 
 
 def box_iou(box1, box2, eps=1e-7):
