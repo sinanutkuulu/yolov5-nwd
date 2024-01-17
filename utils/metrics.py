@@ -316,26 +316,24 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
 
 
 def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
-    # Returns Normalized Wasserstein Distance of box1(1,4) to box2(n,4)
-    if xywh:  # transform from xywh to xyxy
-        bboxes1 = bboxes1.view(-1, 4)
-        bboxes2 = bboxes2.view(-1, 4)
-        # Convert from [center_x, center_y, width, height] to [center_x, center_y, width/2, height/2]
-        boxes1 = torch.cat(((bboxes1[:, :2]), bboxes1[:, 2:] / 2), dim=1)
-        boxes2 = torch.cat(((bboxes2[:, :2]), bboxes2[:, 2:] / 2), dim=1)
-    else:  # assume input is already in the format [x1, y1, x2, y2]
-        # Convert from [x1, y1, x2, y2] to [center_x, center_y, width/2, height/2]
-        boxes1 = torch.cat(((bboxes1[:, 2:] + bboxes1[:, :2]) / 2, (bboxes1[:, 2:] - bboxes1[:, :2]) / 2), dim=1)
-        boxes2 = torch.cat(((bboxes2[:, 2:] + bboxes2[:, :2]) / 2, (bboxes2[:, 2:] - bboxes2[:, :2]) / 2), dim=1)
+    center1 = (bboxes1[..., :, None, :2] + bboxes1[..., :, None, 2:]) / 2
+    center2 = (bboxes2[..., None, :, :2] + bboxes2[..., None, :, 2:]) / 2
+    whs = center1[..., :2] - center2[..., :2]
 
-    # Calculate Wasserstein distance using the provided formula
-    nwd = torch.norm(boxes1.unsqueeze(1) - boxes2.unsqueeze(0), dim=2,
-                     p=2)  # Frobenius norm (Euclidean norm in this case)
+    center_distance = whs[..., 0] * whs[..., 0] + whs[..., 1] * whs[..., 1] + eps  #
 
-    # Normalize Wasserstein distance to get NWD
-    normalized_nwd = torch.exp(-torch.sqrt(nwd) / C)
+    w1 = bboxes1[..., :, None, 2] - bboxes1[..., :, None, 0] + eps
+    h1 = bboxes1[..., :, None, 3] - bboxes1[..., :, None, 1] + eps
+    w2 = bboxes2[..., None, :, 2] - bboxes2[..., None, :, 0] + eps
+    h2 = bboxes2[..., None, :, 3] - bboxes2[..., None, :, 1] + eps
 
-    return normalized_nwd
+    wh_distance = ((w1 - w2) ** 2 + (h1 - h2) ** 2) / (weight ** 2)
+
+    wassersteins = torch.sqrt(center_distance + wh_distance)
+
+    normalized_wasserstein = torch.exp(-wassersteins / C)
+
+    return normalized_wasserstein
 
 
 def box_iou(box1, box2, eps=1e-7):
