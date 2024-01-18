@@ -891,7 +891,7 @@ def nwd_based_nms(boxes, scores, nwd_thres=0.45):
 
 def non_max_suppression(
         prediction,
-        conf_thres=0.25,
+        conf_thres=0.30,
         iou_thres=0.45,
         classes=None,
         agnostic=False,
