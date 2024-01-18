@@ -348,6 +348,40 @@ def box_iou(box1, box2, eps=1e-7):
     return inter / ((a2 - a1).prod(2) + (b2 - b1).prod(2) - inter + eps)
 
 
+def bbox_nwd(bboxes1, bboxes2, C=12.7, eps=1e-7):
+    """
+    Return normalized Wasserstein distance between boxes.
+    Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
+    Arguments:
+        bboxes1 (Tensor[N, 4])
+        bboxes2 (Tensor[M, 4])
+    Returns:
+        nwd (Tensor[N, M]): the NxM matrix containing the pairwise
+            Normalized Wasserstein Distance values for every element in bboxes1 and bboxes2
+    """
+
+    # Calculate centers (cx, cy) and half widths/heights (half_w, half_h)
+    centers1 = (bboxes1[:, 2:] + bboxes1[:, :2]) / 2
+    half_sizes1 = (bboxes1[:, 2:] - bboxes1[:, :2]) / 2
+
+    centers2 = (bboxes2[:, 2:] + bboxes2[:, :2]) / 2
+    half_sizes2 = (bboxes2[:, 2:] - bboxes2[:, :2]) / 2
+
+    # Compute center distances between each combination of boxes
+    center_distance = ((centers1.unsqueeze(1) - centers2.unsqueeze(0)) ** 2).sum(dim=2)
+
+    # Compute size distances between each combination of boxes
+    size_distance = ((half_sizes1.unsqueeze(1) - half_sizes2.unsqueeze(0)) ** 2).sum(dim=2)
+
+    # Compute the Wasserstein distance
+    wasserstein_distance = torch.sqrt(center_distance + size_distance + eps)
+
+    # Compute the Normalized Wasserstein Distance
+    normalized_wasserstein = torch.exp(-wasserstein_distance / C)
+
+    return normalized_wasserstein
+
+
 def bbox_ioa(box1, box2, eps=1e-7):
     """ Returns the intersection over box2 area given box1, box2. Boxes are x1y1x2y2
     box1:       np.array of shape(4)

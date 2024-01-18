@@ -42,7 +42,7 @@ from utils.dataloaders import create_dataloader
 from utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset, check_img_size, check_requirements,
                            check_yaml, coco80_to_coco91_class, colorstr, increment_path, non_max_suppression,
                            print_args, scale_boxes, xywh2xyxy, xyxy2xywh)
-from utils.metrics import ConfusionMatrix, ap_per_class, box_iou, bbox_overlaps_nwd
+from utils.metrics import ConfusionMatrix, ap_per_class, box_iou, bbox_nwd
 from utils.plots import output_to_target, plot_images, plot_val_study
 from utils.torch_utils import select_device, smart_inference_mode
 
@@ -82,7 +82,7 @@ def process_batch(detections, labels, iouv):
     """
     correct = np.zeros((detections.shape[0], iouv.shape[0])).astype(bool)
     #iou = box_iou(labels[:, 1:], detections[:, :4])
-    iou = bbox_overlaps_nwd(labels[:, 1:], detections[:, :4])
+    iou = bbox_nwd(labels[:, 1:], detections[:, :4])
     correct_class = labels[:, 0:1] == detections[:, 5]
     for i in range(len(iouv)):
         x = torch.where((iou >= iouv[i]) & correct_class)  # IoU > threshold and classes match
