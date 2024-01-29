@@ -286,7 +286,7 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, constant=12.8):
 '''
 
 
-def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True):
+def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, C=12.7, xywh=True):
     # Returns Normalized Wasserstein Distance of box1(1,4) to box2(n,4)
 
     center1 = (bboxes1[..., :2] + bboxes1[..., 2:]) / 2
