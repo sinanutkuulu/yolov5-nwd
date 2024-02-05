@@ -219,6 +219,7 @@ def run(
         targets[:, 2:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
         iou_thres = 0.5
+        conf_thres = 0.3
         with dt[2]:
             preds = non_max_suppression(preds,
                                         conf_thres,
