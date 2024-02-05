@@ -928,7 +928,7 @@ def non_max_suppression(
     time_limit = 0.5 + 0.05 * bs  # seconds to quit after
     redundant = True  # require redundant detections
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
-    merge = False  # use merge-NMS
+    merge = True  # use merge-NMS
 
     t = time.time()
     mi = 5 + nc  # mask start index
@@ -987,7 +987,7 @@ def non_max_suppression(
         i = i[:max_det]  # limit detections
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
                 # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-                iou = bbox_overlaps_nwd(boxes[i], boxes) > nwd_thres  # iou matrix
+                iou = bbox_overlaps_nwd(boxes[i], boxes) < nwd_thres  # iou matrix
                 weights = iou * scores[None]  # box weights
                 x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
                 if redundant:
