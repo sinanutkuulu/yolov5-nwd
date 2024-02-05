@@ -883,7 +883,7 @@ def nwd_based_nms(boxes, scores, nwd_thres=0.5):
         nwd = bbox_overlaps_nwd(boxes[i].view(-1, 4), boxes[order[1:]])
 
         # Filter out boxes
-        mask = nwd < nwd_thres
+        mask = nwd > nwd_thres
         order = order[1:][mask]
 
     return keep[:keep_count]
