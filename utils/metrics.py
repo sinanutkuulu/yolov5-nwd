@@ -292,8 +292,11 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, C=12.7, xywh=True):
     center1 = (bboxes1[..., :2] + bboxes1[..., 2:]) / 2
     center2 = (bboxes2[..., :2] + bboxes2[..., 2:]) / 2
 
-    wh1 = bboxes1[..., 2:] - bboxes1[..., :2]
-    wh2 = bboxes2[..., 2:] - bboxes2[..., :2]
+    #wh1 = bboxes1[..., 2:] - bboxes1[..., :2]
+    #wh2 = bboxes2[..., 2:] - bboxes2[..., :2]
+
+    wh1 = bboxes1[..., 2:]
+    wh2 = bboxes2[..., 2:]
 
     center_distance = ((center1[..., 0] - center2[..., 0]) ** 2 + (center1[..., 1] - center2[..., 1]) ** 2 + eps)
 
