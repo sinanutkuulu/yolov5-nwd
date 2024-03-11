@@ -862,7 +862,7 @@ def clip_segments(segments, shape):
         segments[:, 0] = segments[:, 0].clip(0, shape[1])  # x
         segments[:, 1] = segments[:, 1].clip(0, shape[0])  # y
 
-def nwd_based_nms(boxes, scores, nwd_thres=0.5):
+def nwd_based_nms(boxes, scores, nwd_thres=0.6):
     num_boxes = scores.size(0)
     keep = torch.zeros(num_boxes, dtype=torch.long, device=scores.device)
     keep_count = 0
@@ -891,13 +891,13 @@ def nwd_based_nms(boxes, scores, nwd_thres=0.5):
 
 def non_max_suppression(
         prediction,
-        conf_thres=0.30,
-        iou_thres=0.5,
+        conf_thres=0.001,
+        iou_thres=0.6,
         classes=None,
         agnostic=False,
         multi_label=False,
         labels=(),
-        max_det=3000,
+        max_det=300,
         nwd_thres = 0.5,
         nm=0,  # number of masks
 ):
