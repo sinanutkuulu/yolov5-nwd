@@ -364,52 +364,47 @@ def js_divergence_loss(boxes1, boxes2, alpha=0.5):
     return torch.tensor(js_divergences)
 
 
-def js_divergence_loss_vectorized(boxes1, boxes2, alpha=0.5):
+def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
     """
-    Calculate the Jensen-Shannon (JS) divergence between two sets of boxes, using Gaussian distributions.
+    Calculate the Jensen-Shannon (JS) divergence between one predicted box and multiple ground truth boxes.
 
     Parameters:
-    - boxes1 (Tensor): The predicted boxes, shape (m, 4) with [x0, y0, w, h].
+    - box1 (Tensor): The predicted box, shape (1, 4) with [x0, y0, w, h].
     - boxes2 (Tensor): The ground truth boxes, shape (n, 4) with [x0, y0, w, h].
     - alpha (float): The weight for the JS divergence, between 0 and 1.
 
     Returns:
-    - Tensor: The calculated JS divergence for each pair of boxes.
+    - Tensor: The calculated JS divergence for each ground truth box.
     """
 
-    # Calculate covariance matrices for all boxes (assuming w, h are standard deviations)
-    Sigma1 = torch.diag_embed(boxes1[:, 2:] ** 2 / 4)
+    # Calculate covariance matrices for the predicted box and ground truth boxes
+    Sigma1 = torch.diag_embed(box1[:, 2:] ** 2 / 4)
     Sigma2 = torch.diag_embed(boxes2[:, 2:] ** 2 / 4)
 
-    # Expand boxes to allow broadcasting for all pairs (m x n)
-    mu1 = boxes1[:, :2].unsqueeze(1)  # Shape (m, 1, 2)
-    Sigma1 = Sigma1.unsqueeze(1)  # Shape (m, 1, 2, 2)
-    mu2 = boxes2[:, :2].unsqueeze(0)  # Shape (1, n, 2)
-    Sigma2 = Sigma2.unsqueeze(0)  # Shape (1, n, 2, 2)
+    # Calculate the mean vectors
+    mu1 = box1[:, :2]  # Shape (1, 2)
+    mu2 = boxes2[:, :2]  # Shape (n, 2)
 
     # Calculate the center of gravity for the mean
-    mu_alpha = (1 - alpha) * mu1 + alpha * mu2  # Shape (m, n, 2)
+    mu_alpha = (1 - alpha) * mu1 + alpha * mu2  # Shape (n, 2)
 
     # Calculate the harmonic mean of the covariance matrices
-    Sigma_alpha_inv = torch.linalg.inv((1 - alpha) * torch.linalg.inv(Sigma1) + alpha * torch.linalg.inv(Sigma2))
+    Sigma_alpha = (1 - alpha) * torch.inverse(Sigma1) + alpha * torch.inverse(Sigma2)
+    Sigma_alpha_inv = torch.linalg.inv(Sigma_alpha)
 
     # Calculate the terms of the JS divergence formula
-    tr_term = torch.diagonal(Sigma_alpha_inv @ ((1 - alpha) * Sigma1 + alpha * Sigma2), dim1=-2, dim2=-1).sum(-1)
-    log_det_term = torch.logdet(Sigma_alpha_inv) - \
-                   ((1 - alpha) * torch.logdet(Sigma1) + alpha * torch.logdet(Sigma2))
+    tr_term = torch.diagonal(Sigma_alpha_inv, dim1=-2, dim2=-1).sum(-1) * ((1 - alpha) + alpha)  # Simplified trace term
+    log_det_term = torch.logdet(Sigma_alpha_inv) - ((1 - alpha) * torch.logdet(Sigma1) + alpha * torch.logdet(Sigma2))
 
     # Compute the quadratic terms for mu
-    mu_diff1 = mu_alpha - mu1
-    mu_diff2 = mu_alpha - mu2
-    quad_term1 = (1 - alpha) * torch.einsum('...i,...ij,...j', mu_diff1, Sigma_alpha_inv, mu_diff1)
-    quad_term2 = alpha * torch.einsum('...i,...ij,...j', mu_diff2, Sigma_alpha_inv, mu_diff2)
+    mu_diff = mu_alpha - mu1  # Shape (n, 2)
+    quad_term = (1 - alpha) * torch.einsum('...i,...ij,...j', mu_diff, Sigma_alpha_inv, mu_diff)
 
     # Combine the terms to calculate the JS divergence
-    js_div = 0.5 * (tr_term + log_det_term - 2 + quad_term1 + quad_term2)
+    js_div = 0.5 * (tr_term + log_det_term - 2 + quad_term)
 
-    # The result is a matrix of JS divergences for each combination of boxes from boxes1 and boxes2
+    # Return a 1D tensor of JS divergences
     return js_div
-
 
 '''
 def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True, weight=2):
