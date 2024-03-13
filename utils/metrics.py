@@ -388,8 +388,8 @@ def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
     # Compute the quadratic terms for mu
     mu_diff1 = mu_alpha - mu1  # Shape (n, 2)
     mu_diff2 = mu_alpha - mu2  # Shape (n, 2)
-    quad_term1 = (1 - alpha) * mu_diff1.T @ Sigma_alpha_inv @ mu_diff1
-    quad_term2 = alpha * mu_diff2.T @ Sigma_alpha_inv @ mu_diff2
+    quad_term1 = (1 - alpha) * mu_diff1 @ Sigma_alpha_inv @ mu_diff1.T
+    quad_term2 = alpha * mu_diff2 @ Sigma_alpha_inv @ mu_diff2.T
     quad_term = quad_term1 + quad_term2
     #quad_term = (1 - alpha) * torch.einsum('...i,...ij,...j', mu_diff, Sigma_alpha_inv, mu_diff)
 
