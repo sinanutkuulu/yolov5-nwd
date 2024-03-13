@@ -6,7 +6,7 @@ Loss functions
 import torch
 import torch.nn as nn
 
-from utils.metrics import bbox_iou, bbox_overlaps_nwd, js_divergence_loss
+from utils.metrics import bbox_iou, bbox_overlaps_nwd, js_divergence_loss, js_divergence_loss_vectorized
 from utils.torch_utils import de_parallel
 
 
@@ -140,7 +140,8 @@ class ComputeLoss:
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
                 #iou = bbox_iou(pbox, tbox[i], CIoU=True).squeeze()  # iou(prediction, target)
                 #iou = bbox_overlaps_nwd(pbox, tbox[i]).squeeze()
-                iou = js_divergence_loss(pbox, tbox[i]).squeeze()
+                #iou = js_divergence_loss(pbox, tbox[i]).squeeze()
+                iou = js_divergence_loss_vectorized(pbox, tbox[i]).squeeze()
                 iou = 1 / (1.0 + (iou ** 2))
                 lbox += (1.0 - iou).mean()  # iou loss
 
