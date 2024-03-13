@@ -365,17 +365,6 @@ def js_divergence_loss(boxes1, boxes2, alpha=0.5):
 
 
 def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
-    """
-    Calculate the Jensen-Shannon (JS) divergence between one predicted box and multiple ground truth boxes.
-
-    Parameters:
-    - box1 (Tensor): The predicted box, shape (1, 4) with [x0, y0, w, h].
-    - boxes2 (Tensor): The ground truth boxes, shape (n, 4) with [x0, y0, w, h].
-    - alpha (float): The weight for the JS divergence, between 0 and 1.
-
-    Returns:
-    - Tensor: The calculated JS divergence for each ground truth box.
-    """
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     # Calculate covariance matrices for the predicted box and ground truth boxes
     Sigma1 = torch.diag_embed(box1[:, 2:] ** 2 / 4)
@@ -386,15 +375,13 @@ def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
     mu2 = boxes2[:, :2]  # Shape (n, 2)
 
     # Calculate the center of gravity for the mean
-    mu_alpha = (1 - alpha) * torch.inverse(Sigma1) * mu1 + alpha * torch.inverse(Sigma2) * mu2  # Shape (n, 2)
+    mu_alpha = (1 - alpha) * mu1 + alpha * mu2  # Shape (n, 2)
 
-    # Calculate the harmonic mean of the covariance matrices
     Sigma_alpha = (1 - alpha) * torch.inverse(Sigma1) + alpha * torch.inverse(Sigma2)
     Sigma_alpha_inv = torch.linalg.inv(Sigma_alpha)
 
-    # Calculate the terms of the JS divergence formula
     tr_term = torch.diagonal(Sigma_alpha_inv @ ((1 - alpha) * Sigma1 + alpha * Sigma2), dim1=-2, dim2=-1).sum(-1)
-  # Simplified trace term
+
     log_det_term = torch.logdet(Sigma_alpha_inv) - ((1 - alpha) * torch.logdet(Sigma1) + alpha * torch.logdet(Sigma2))
 
     # Compute the quadratic terms for mu
