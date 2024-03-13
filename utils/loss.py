@@ -144,6 +144,8 @@ class ComputeLoss:
                 iou = js_divergence_loss_vectorized(pbox, tbox[i]).squeeze()
                 iou = 1 / (1.0 + (iou ** 2))
                 lbox += (1.0 - iou).mean()  # iou loss
+                iou = iou.view(-1)
+                b, a, gj, gi = b.view(-1), a.view(-1), gj.view(-1), gi.view(-1)
 
                 # Objectness
                 iou = iou.detach().clamp(0).type(tobj.dtype)
