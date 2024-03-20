@@ -6,7 +6,7 @@ Loss functions
 import torch
 import torch.nn as nn
 
-from utils.metrics import bbox_iou, bbox_overlaps_nwd, js_divergence_loss, js_divergence_loss_vectorized
+from utils.metrics import bbox_iou, bbox_overlaps_nwd, js_divergence_loss_vectorized
 from utils.torch_utils import de_parallel
 
 
