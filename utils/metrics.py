@@ -351,7 +351,7 @@ def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
 
     # Compute Sigma_alpha_inv using solve instead of inverse for better stability and possibly less memory
     I = torch.eye(Sigma1.size(-1)).to(Sigma1.device)
-    Sigma_alpha_inv = (1 - alpha) * torch.linalg.solve(I, Sigma1).solution + alpha * torch.linalg.solve(I, Sigma2).solution
+    Sigma_alpha_inv = (1 - alpha) * torch.linalg.solve(I, Sigma1) + alpha * torch.linalg.solve(I, Sigma2)
 
     # Calculate terms for JS divergence
     # Use torch.matmul for batch matrix multiplication, might save memory vs @ operator
@@ -365,8 +365,8 @@ def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
     mu_diff2 = mu_alpha - mu2  # Shape (n, 2)
 
     # Use torch.solve instead of @ for matrix-vector product
-    quad_term1 = (1 - alpha) * torch.matmul(mu_diff1, torch.linalg.solve(mu_diff1.T, Sigma_alpha_inv).solution)
-    quad_term2 = alpha * torch.matmul(mu_diff2, torch.linalg.solve(mu_diff2.T, Sigma_alpha_inv).solution)
+    quad_term1 = (1 - alpha) * torch.matmul(mu_diff1, torch.linalg.solve(mu_diff1.T, Sigma_alpha_inv))
+    quad_term2 = alpha * torch.matmul(mu_diff2, torch.linalg.solve(mu_diff2.T, Sigma_alpha_inv))
     quad_term = quad_term1 + quad_term2
 
     js_div = 0.5 * (tr_term + log_det_term - 2 + quad_term)
