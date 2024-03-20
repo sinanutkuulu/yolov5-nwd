@@ -307,74 +307,16 @@ def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-6, C=12.7, xywh=True):
 
     return normalized_wasserstein
 
-
-def js_divergence_loss(boxes1, boxes2, alpha=0.5):
-    """
-    Calculate the Jensen-Shannon (JS) divergence between two sets of boxes, using Gaussian distributions.
-
-    Parameters:
-    - boxes1 (Tensor): The predicted boxes, shape (m, 4) with [x0, y0, w, h].
-    - boxes2 (Tensor): The ground truth boxes, shape (n, 4) with [x0, y0, w, h].
-    - alpha (float): The weight for the JS divergence, between 0 and 1.
-
-    Returns:
-    - Tensor: The calculated JS divergence for each pair of boxes.
-    """
-
-    # Helper function to calculate the covariance matrix for a box
-    def covariance_matrix(w, h):
-        return torch.tensor([[w ** 2 / 4, 0], [0, h ** 2 / 4]])
-
-    # Initialize JS divergence list
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    js_divergences = []
-
-    # Calculate JS divergence for each pair of boxes
-    for box1 in boxes1:
-        for box2 in boxes2:
-            mu1 = box1[:2]
-            sigma1 = covariance_matrix(box1[2], box1[3])
-
-            mu2 = box2[:2]
-            sigma2 = covariance_matrix(box2[2], box2[3])
-
-            # Calculate the center of gravity for the mean
-            mu_alpha = (1 - alpha) * mu1 + alpha * mu2
-
-            # Calculate the harmonic mean of the covariance matrices
-            sigma_alpha_inv = torch.linalg.inv(
-                (1 - alpha) * torch.linalg.inv(sigma1) + alpha * torch.linalg.inv(sigma2))
-
-            # Calculate the terms of the JS divergence formula
-            tr_term = torch.trace(sigma_alpha_inv @ ((1 - alpha) * sigma1 + alpha * sigma2))
-            log_det_term = torch.log(torch.linalg.det(sigma_alpha_inv)) - \
-                           ((1 - alpha) * torch.log(torch.linalg.det(sigma1)) +
-                            alpha * torch.log(torch.linalg.det(sigma2)))
-            mu_diff1 = mu_alpha - mu1
-            mu_diff2 = mu_alpha - mu2
-            quad_term1 = (1 - alpha) * mu_diff1 @ sigma_alpha_inv @ mu_diff1
-            quad_term2 = alpha * mu_diff2 @ sigma_alpha_inv @ mu_diff2
-
-            # Combine the terms to calculate the JS divergence
-            js_div = 0.5 * (tr_term + log_det_term - 2 + quad_term1 + quad_term2)
-            js_divergences.append(js_div)
-
-    # Convert the list to a tensor
-    return torch.tensor(js_divergences)
-
-
+'''
 def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     # Calculate covariance matrices for the predicted box and ground truth boxes
     Sigma1 = torch.diag_embed(box1[:, 2:] ** 2 / 4)
     Sigma2 = torch.diag_embed(boxes2[:, 2:] ** 2 / 4)
 
-    # Calculate the mean vectors
     mu1 = box1[:, :2]  # Shape (1, 2)
     mu2 = boxes2[:, :2]  # Shape (n, 2)
 
-    # Calculate the center of gravity for the mean
     mu_alpha = (1 - alpha) * mu1 + alpha * mu2  # Shape (n, 2)
 
     Sigma_alpha = (1 - alpha) * torch.inverse(Sigma1) + alpha * torch.inverse(Sigma2)
@@ -384,20 +326,52 @@ def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
 
     log_det_term = torch.logdet(Sigma_alpha_inv) - ((1 - alpha) * torch.logdet(Sigma1) + alpha * torch.logdet(Sigma2))
 
-    # Compute the quadratic terms for mu
-    # Compute the quadratic terms for mu
     mu_diff1 = mu_alpha - mu1  # Shape (n, 2)
     mu_diff2 = mu_alpha - mu2  # Shape (n, 2)
     quad_term1 = (1 - alpha) * mu_diff1 @ Sigma_alpha_inv @ mu_diff1.T
     quad_term2 = alpha * mu_diff2 @ Sigma_alpha_inv @ mu_diff2.T
     quad_term = quad_term1 + quad_term2
-    #quad_term = (1 - alpha) * torch.einsum('...i,...ij,...j', mu_diff, Sigma_alpha_inv, mu_diff)
 
-    # Combine the terms to calculate the JS divergence
+
     js_div = 0.5 * (tr_term + log_det_term - 2 + quad_term)
 
-    # Return a 1D tensor of JS divergences
     return js_div
+'''
+def js_divergence_loss_vectorized(box1, boxes2, alpha=0.5):
+    # Assuming default tensor type is set to CUDA outside this function
+
+    # Calculate covariance matrices for the predicted box and ground truth boxes
+    Sigma1 = torch.diag(box1[:, 2:] ** 2 / 4).to(box1.device)
+    Sigma2 = torch.diag_embed(boxes2[:, 2:] ** 2 / 4).to(boxes2.device)
+
+    mu1 = box1[:, :2].to(box1.device)  # Shape (1, 2)
+    mu2 = boxes2[:, :2] .to(boxes2.device) # Shape (n, 2)
+
+    mu_alpha = (1 - alpha) * mu1 + alpha * mu2  # Shape (n, 2)
+
+    # Compute Sigma_alpha_inv using solve instead of inverse for better stability and possibly less memory
+    I = torch.eye(Sigma1.size(-1)).to(Sigma1.device)
+    Sigma_alpha_inv = (1 - alpha) * torch.solve(I, Sigma1).solution + alpha * torch.solve(I, Sigma2).solution
+
+    # Calculate terms for JS divergence
+    # Use torch.matmul for batch matrix multiplication, might save memory vs @ operator
+    combined_sigma = (1 - alpha) * Sigma1 + alpha * Sigma2
+    tr_term = torch.einsum('bii->b', torch.matmul(Sigma_alpha_inv, combined_sigma))
+
+    log_det_term = torch.logdet(Sigma_alpha_inv) - \
+                   ((1 - alpha) * torch.logdet(Sigma1) + alpha * torch.logdet(Sigma2))
+
+    mu_diff1 = mu_alpha - mu1  # Shape (n, 2)
+    mu_diff2 = mu_alpha - mu2  # Shape (n, 2)
+
+    # Use torch.solve instead of @ for matrix-vector product
+    quad_term1 = (1 - alpha) * torch.matmul(mu_diff1, torch.solve(mu_diff1.T, Sigma_alpha_inv).solution)
+    quad_term2 = alpha * torch.matmul(mu_diff2, torch.solve(mu_diff2.T, Sigma_alpha_inv).solution)
+    quad_term = quad_term1 + quad_term2
+
+    js_div = 0.5 * (tr_term + log_det_term - 2 + quad_term)
+
+    return js_div  # Ensure the result is 1D
 
 '''
 def bbox_overlaps_nwd(bboxes1, bboxes2, eps=1e-7, C=12.7, xywh=True, weight=2):

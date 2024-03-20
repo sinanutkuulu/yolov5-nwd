@@ -140,9 +140,7 @@ class ComputeLoss:
                 pbox = torch.cat((pxy, pwh), 1)  # predicted box
                 #iou = bbox_iou(pbox, tbox[i], CIoU=True).squeeze()  # iou(prediction, target)
                 #iou = bbox_overlaps_nwd(pbox, tbox[i]).squeeze()
-                #iou = js_divergence_loss(pbox, tbox[i]).squeeze()
                 iou = js_divergence_loss_vectorized(pbox, tbox[i]).squeeze()
-                #print(iou.size())
                 iou = 1 / (1.0 + (iou ** 2))
                 lbox += (1.0 - iou).mean()  # iou loss
 
